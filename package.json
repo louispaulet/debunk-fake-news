@@ -1,0 +1,62 @@
+{
+  "name": "debunk-fake-news",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A small, public AI-assisted fake-news assessment tool.",
+  "scripts": {
+    "dev": "concurrently -k -n worker,web -c cyan,magenta \"npm:dev:worker\" \"npm:dev:web\"",
+    "dev:web": "vite",
+    "dev:worker": "wrangler dev --env development --port 8787",
+    "lint": "eslint .",
+    "typecheck": "tsc -b",
+    "types": "wrangler types",
+    "types:check": "wrangler types --check",
+    "test": "npm run test:frontend && npm run test:worker",
+    "test:frontend": "vitest run --config vitest.frontend.config.ts",
+    "test:worker": "vitest run --config vitest.worker.config.ts",
+    "build": "npm run build:frontend && npm run build:worker",
+    "build:frontend": "vite build",
+    "build:worker": "wrangler deploy --env=\"\" --dry-run --outdir dist-worker",
+    "check": "npm run lint && npm run types:check && npm run typecheck && npm test && npm run build",
+    "deploy:worker": "wrangler deploy --env=\"\"",
+    "tail": "wrangler tail debunk-fake-news-api"
+  },
+  "dependencies": {
+    "groq-sdk": "^1.4.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.18.8",
+    "@cloudflare/workers-types": "^5.20260727.1",
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.9",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "concurrently": "^9.2.1",
+    "eslint": "^10.8.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "jsdom": "^27.4.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.114.0"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20260722.1": true
+  }
+}

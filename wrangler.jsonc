@@ -1,0 +1,34 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "debunk-fake-news-api",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-07-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "ALLOWED_ORIGINS": "https://louispaulet.github.io",
+    "TURNSTILE_HOSTNAMES": "louispaulet.github.io",
+    "GROQ_MODEL": "openai/gpt-oss-20b"
+  },
+  "secrets": {
+    "required": ["GROQ_API_KEY", "TURNSTILE_SECRET"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "env": {
+    "development": {
+      "name": "debunk-fake-news-api-development",
+      "secrets": {
+        "required": ["GROQ_API_KEY", "TURNSTILE_SECRET"]
+      },
+      "vars": {
+        "ENVIRONMENT": "development",
+        "ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173",
+        "TURNSTILE_HOSTNAMES": "localhost,127.0.0.1",
+        "GROQ_MODEL": "openai/gpt-oss-20b"
+      }
+    }
+  }
+}
