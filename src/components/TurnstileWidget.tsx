@@ -17,7 +17,6 @@ interface TurnstileRenderOptions {
 }
 
 interface TurnstileApi {
-  ready: (callback: () => void) => void
   render: (
     container: HTMLElement,
     options: TurnstileRenderOptions,
@@ -116,32 +115,30 @@ function TurnstileWidgetComponent(
 
     void loadTurnstile()
       .then((turnstile) => {
-        turnstile.ready(() => {
-          if (!active || !containerRef.current || widgetIdRef.current) {
-            return
-          }
+        if (!active || !containerRef.current || widgetIdRef.current) {
+          return
+        }
 
-          widgetIdRef.current = turnstile.render(containerRef.current, {
-            sitekey,
-            action: 'analyze',
-            theme: 'light',
-            callback: (token) => {
-              onError(null)
-              onToken(token)
-            },
-            'error-callback': () => {
-              onToken(null)
-              onError('The human check failed. Please try again.')
-            },
-            'expired-callback': () => {
-              onToken(null)
-              onError('The human check expired. Please complete it again.')
-            },
-            'timeout-callback': () => {
-              onToken(null)
-              onError('The human check timed out. Please try again.')
-            },
-          })
+        widgetIdRef.current = turnstile.render(containerRef.current, {
+          sitekey,
+          action: 'analyze',
+          theme: 'light',
+          callback: (token) => {
+            onError(null)
+            onToken(token)
+          },
+          'error-callback': () => {
+            onToken(null)
+            onError('The human check failed. Please try again.')
+          },
+          'expired-callback': () => {
+            onToken(null)
+            onError('The human check expired. Please complete it again.')
+          },
+          'timeout-callback': () => {
+            onToken(null)
+            onError('The human check timed out. Please try again.')
+          },
         })
       })
       .catch(() => {
