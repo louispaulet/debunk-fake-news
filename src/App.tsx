@@ -4,6 +4,7 @@ import {
   TurnstileWidget,
   type TurnstileWidgetHandle,
 } from './components/TurnstileWidget'
+import SiteHeader from './components/SiteHeader'
 import type { AnalysisResult, ApiErrorBody, Verdict } from './types'
 
 const MAX_CONTENT_LENGTH = 20_000
@@ -43,31 +44,6 @@ function isAnalysisResult(value: unknown): value is AnalysisResult {
       candidate.verdict === 'FALSE' ||
       candidate.verdict === 'UNVERIFIABLE') &&
     typeof candidate.reason === 'string'
-  )
-}
-
-function ShieldIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      className="size-5"
-    >
-      <path
-        d="M12 3 5.5 5.8v5.5c0 4.2 2.7 8 6.5 9.7 3.8-1.7 6.5-5.5 6.5-9.7V5.8L12 3Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path
-        d="m9.1 12 1.9 1.9 4-4"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   )
 }
 
@@ -155,20 +131,12 @@ function App() {
       <div className="pointer-events-none absolute -left-40 top-[-15rem] size-[32rem] rounded-full bg-sage/20 blur-3xl" />
       <div className="pointer-events-none absolute -right-52 bottom-[-18rem] size-[38rem] rounded-full bg-coral/10 blur-3xl" />
 
-      <header className="relative mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-6 sm:px-8">
-        <a
-          href="/debunk-fake-news/"
-          className="flex items-center gap-2.5 font-semibold tracking-tight"
-        >
-          <span className="grid size-9 place-items-center rounded-xl bg-ink text-cream shadow-sm">
-            <ShieldIcon />
-          </span>
-          <span>TruthCheck</span>
-        </a>
-        <span className="rounded-full border border-ink/10 bg-white/55 px-3 py-1.5 text-xs font-medium text-ink/65 backdrop-blur">
-          AI-assisted · Beta
-        </span>
-      </header>
+      <SiteHeader
+        action={{
+          href: `${import.meta.env.BASE_URL}about.html`,
+          label: 'About TruthCheck',
+        }}
+      />
 
       <main className="relative mx-auto w-full max-w-6xl px-5 pb-16 pt-8 sm:px-8 sm:pt-14">
         <section className="mx-auto max-w-3xl text-center">

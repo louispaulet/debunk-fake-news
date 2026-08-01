@@ -30,6 +30,14 @@ describe('App', () => {
     vi.unstubAllGlobals()
   })
 
+  it('links to the About page from the header', () => {
+    render(<App />)
+
+    expect(
+      screen.getByRole('link', { name: /about truthcheck/i }),
+    ).toHaveAttribute('href', expect.stringMatching(/\/about\.html$/))
+  })
+
   it('submits verified content and presents a verdict with its reason', async () => {
     const user = userEvent.setup()
     const fetchMock = vi.fn().mockResolvedValue(
