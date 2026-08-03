@@ -10,18 +10,31 @@ interface FetchMockOptions {
     reason: string
   }
   articleHtml?: string
+  youtubeTranscript?: string[]
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
 }
 
 function installFetchMock({
   turnstileSuccess = true,
   result,
   articleHtml,
+  youtubeTranscript,
 }: FetchMockOptions = {}) {
   let groqCalls = 0
   let articleCalls = 0
+  let youtubePlayerCalls = 0
+  let youtubeTranscriptCalls = 0
+  let lastGroqPrompt: string | null = null
+  const events: string[] = []
 
   vi.spyOn(globalThis, 'fetch').mockImplementation(
-    (input: RequestInfo | URL, init?: RequestInit) => {
+    async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = new Request(input, init)
       const url = new URL(request.url)
 
@@ -30,13 +43,12 @@ function installFetchMock({
         url.origin === 'https://challenges.cloudflare.com' &&
         url.pathname === '/turnstile/v0/siteverify'
       ) {
-        return Promise.resolve(
-          Response.json({
-            success: turnstileSuccess,
-            action: turnstileSuccess ? 'analyze' : undefined,
-            hostname: turnstileSuccess ? 'louispaulet.github.io' : undefined,
-          }),
-        )
+        events.push('turnstile')
+        return Response.json({
+          success: turnstileSuccess,
+          action: turnstileSuccess ? 'analyze' : undefined,
+          hostname: turnstileSuccess ? 'louispaulet.github.io' : undefined,
+        })
       }
 
       if (
@@ -46,11 +58,52 @@ function installFetchMock({
         articleHtml
       ) {
         articleCalls += 1
-        return Promise.resolve(
-          new Response(articleHtml, {
-            headers: { 'Content-Type': 'text/html; charset=utf-8' },
-          }),
-        )
+        events.push('article')
+        return new Response(articleHtml, {
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        })
+      }
+
+      if (
+        request.method === 'POST' &&
+        url.origin === 'https://www.youtube.com' &&
+        url.pathname === '/youtubei/v1/player' &&
+        youtubeTranscript
+      ) {
+        youtubePlayerCalls += 1
+        events.push('youtube-player')
+        return Response.json({
+          captions: {
+            playerCaptionsTracklistRenderer: {
+              captionTracks: [
+                {
+                  baseUrl:
+                    'https://www.youtube.com/api/timedtext?v=_neA7v3ulPU',
+                  languageCode: 'fr',
+                },
+              ],
+            },
+          },
+        })
+      }
+
+      if (
+        request.method === 'GET' &&
+        url.origin === 'https://www.youtube.com' &&
+        url.pathname === '/api/timedtext' &&
+        youtubeTranscript
+      ) {
+        youtubeTranscriptCalls += 1
+        events.push('youtube-transcript')
+        const transcriptXml = youtubeTranscript
+          .map(
+            (text, index) =>
+              `<text start="${index}" dur="1">${escapeXml(text)}</text>`,
+          )
+          .join('')
+        return new Response(`<transcript>${transcriptXml}</transcript>`, {
+          headers: { 'Content-Type': 'text/xml; charset=utf-8' },
+        })
       }
 
       if (
@@ -60,34 +113,48 @@ function installFetchMock({
         result
       ) {
         groqCalls += 1
-        return Promise.resolve(
-          Response.json({
-            id: 'chatcmpl-test',
-            object: 'chat.completion',
-            created: 0,
-            model: 'openai/gpt-oss-20b',
-            choices: [
-              {
-                index: 0,
-                message: {
-                  role: 'assistant',
-                  content: JSON.stringify(result),
-                },
-                finish_reason: 'stop',
+        events.push('groq')
+        const payload: unknown = await request.json()
+        if (payload && typeof payload === 'object') {
+          const messages = (payload as Record<string, unknown>).messages
+          if (Array.isArray(messages)) {
+            const userMessage: unknown = (messages as unknown[]).find(
+              (message) =>
+                message &&
+                typeof message === 'object' &&
+                (message as Record<string, unknown>).role === 'user',
+            )
+            if (userMessage && typeof userMessage === 'object') {
+              const content = (userMessage as Record<string, unknown>).content
+              lastGroqPrompt = typeof content === 'string' ? content : null
+            }
+          }
+        }
+
+        return Response.json({
+          id: 'chatcmpl-test',
+          object: 'chat.completion',
+          created: 0,
+          model: 'openai/gpt-oss-20b',
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: 'assistant',
+                content: JSON.stringify(result),
               },
-            ],
-            usage: {
-              prompt_tokens: 10,
-              completion_tokens: 10,
-              total_tokens: 20,
+              finish_reason: 'stop',
             },
-          }),
-        )
+          ],
+          usage: {
+            prompt_tokens: 10,
+            completion_tokens: 10,
+            total_tokens: 20,
+          },
+        })
       }
 
-      return Promise.reject(
-        new Error(`No fetch mock for ${request.method} ${url.href}`),
-      )
+      throw new Error(`No fetch mock for ${request.method} ${url.href}`)
     },
   )
 
@@ -98,10 +165,24 @@ function installFetchMock({
     get articleCalls() {
       return articleCalls
     },
+    get youtubePlayerCalls() {
+      return youtubePlayerCalls
+    },
+    get youtubeTranscriptCalls() {
+      return youtubeTranscriptCalls
+    },
+    get lastGroqPrompt() {
+      return lastGroqPrompt
+    },
+    events,
   }
 }
 
-async function analyze(content: string, turnstileToken = 'valid-token') {
+async function analyze(
+  content: string,
+  turnstileToken = 'valid-token',
+  youtubeVideoId?: string,
+) {
   return workerExports.default.fetch(
     new Request('https://worker.test/api/analyze', {
       method: 'POST',
@@ -109,7 +190,11 @@ async function analyze(content: string, turnstileToken = 'valid-token') {
         'Content-Type': 'application/json',
         Origin: ORIGIN,
       },
-      body: JSON.stringify({ content, turnstileToken }),
+      body: JSON.stringify({
+        content,
+        turnstileToken,
+        ...(youtubeVideoId ? { youtubeVideoId } : {}),
+      }),
     }),
   )
 }
@@ -202,6 +287,93 @@ describe('debunk-fake-news-api', () => {
     })
     expect(calls.articleCalls).toBe(1)
     expect(calls.groqCalls).toBe(1)
+  })
+
+  it('randomly samples a long article instead of keeping only its beginning', async () => {
+    const longArticle = Array.from(
+      { length: 120 },
+      (_, index) =>
+        `Article section ${index}. ${'Supporting article detail. '.repeat(14)}`,
+    ).join(' ')
+    const calls = installFetchMock({
+      articleHtml: `<html><body><article><p>${longArticle}</p></article></body></html>`,
+      result: {
+        verdict: 'UNVERIFIABLE',
+        reason: 'The sampled article does not provide enough independent evidence.',
+      },
+    })
+
+    const response = await analyze('https://news.example/article')
+
+    expect(response.status).toBe(200)
+    const prompt = calls.lastGroqPrompt
+    expect(prompt).toContain('[Random sample from')
+    const material = prompt?.match(
+      /<untrusted_material>\n\n([\s\S]*?)\n\n<\/untrusted_material>/,
+    )?.[1]
+    expect(material?.length).toBeLessThanOrEqual(20_000)
+  })
+
+  it('retrieves and samples the supplied pyramid-video transcript before asking Groq', async () => {
+    const youtubeTranscript = Array.from(
+      { length: 100 },
+      (_, index) =>
+        `Transcript segment ${index} discusses extraordinary theories about how the Egyptian pyramids were constructed. ${'Claim detail. '.repeat(20)}`,
+    )
+    const calls = installFetchMock({
+      youtubeTranscript,
+      result: {
+        verdict: 'FALSE',
+        reason:
+          'The video thesis conflicts with archaeological and engineering evidence.',
+      },
+    })
+
+    const response = await analyze(
+      'https://www.youtube.com/watch?v=_neA7v3ulPU',
+      'valid-token',
+      '_neA7v3ulPU',
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      verdict: 'FALSE',
+      reason:
+        'The video thesis conflicts with archaeological and engineering evidence.',
+    })
+    expect(calls.youtubePlayerCalls).toBe(1)
+    expect(calls.youtubeTranscriptCalls).toBe(1)
+    expect(calls.articleCalls).toBe(0)
+    expect(calls.groqCalls).toBe(1)
+    expect(calls.events).toEqual([
+      'turnstile',
+      'youtube-player',
+      'youtube-transcript',
+      'groq',
+    ])
+    expect(calls.lastGroqPrompt).toContain(
+      'https://www.youtube.com/watch?v=_neA7v3ulPU',
+    )
+    expect(calls.lastGroqPrompt).toContain('caption transcript')
+    expect(calls.lastGroqPrompt).toContain('[Random sample from')
+  })
+
+  it('rejects a mismatched YouTube URL and video ID without external analysis', async () => {
+    const calls = installFetchMock()
+
+    const response = await analyze(
+      'https://www.youtube.com/watch?v=_neA7v3ulPU',
+      'valid-token',
+      'dQw4w9WgXcQ',
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'INVALID_YOUTUBE_VIDEO' },
+    })
+    expect(calls.youtubePlayerCalls).toBe(0)
+    expect(calls.youtubeTranscriptCalls).toBe(0)
+    expect(calls.groqCalls).toBe(0)
   })
 
   it('rejects browser origins outside the production allowlist', async () => {

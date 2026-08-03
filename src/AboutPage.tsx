@@ -21,13 +21,13 @@ function AboutPage() {
           <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-[-0.045em] sm:text-6xl">
             A pause before you share.
             <span className="mt-1 block font-serif font-normal italic text-forest">
-              A closer look at what you&apos;re reading.
+              A closer look at what you&apos;re reading or watching.
             </span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-7 text-ink/65 sm:text-lg">
             TruthCheck is an AI-assisted starting point for assessing a claim,
-            pasted article, or public article link. It gives you a concise
-            explanation so you can decide what deserves a deeper look.
+            pasted article, public article link, or YouTube video. It gives you
+            a concise explanation so you can decide what deserves a deeper look.
           </p>
         </section>
 
@@ -36,7 +36,7 @@ function AboutPage() {
             [
               '01',
               'Bring the context',
-              'Paste the exact claim, the relevant article text, or a public HTML article link.',
+              'Paste the exact claim, relevant article text, a public HTML article link, or a YouTube URL.',
             ],
             [
               '02',

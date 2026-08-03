@@ -11,7 +11,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./tests/frontend/setup.ts'],
-    include: ['tests/frontend/**/*.test.tsx'],
+    include: ['tests/frontend/**/*.test.{ts,tsx}'],
     restoreMocks: true,
   },
 })

@@ -1,12 +1,12 @@
 # Debunk Fake News
 
 A small public website that gives an AI-assisted assessment of a claim, pasted
-article, or public article URL. It returns `TRUE`, `FALSE`, or `UNVERIFIABLE`
-with a short explanation.
+article, public article URL, or YouTube video. It returns `TRUE`, `FALSE`, or
+`UNVERIFIABLE` with a short explanation.
 
 The frontend is a Vite + React + Tailwind CSS application hosted on GitHub
 Pages. A single Cloudflare Worker validates Turnstile, safely reads submitted
-article pages, and calls Groq.
+article pages or retrieves YouTube captions, and calls Groq once for the verdict.
 
 > This is an AI assessment, not an authoritative fact-check. Confirm important
 > claims with primary sources and reputable fact-checkers.
@@ -16,12 +16,15 @@ article pages, and calls Groq.
 ```text
 GitHub Pages (React)
         |
-        | POST /api/analyze + Turnstile token
+        | detect YouTube URL + POST /api/analyze + Turnstile token
         v
 Cloudflare Worker
-   |             |
-   |             +--> public article page (URL submissions only)
-   +----------------> Groq: openai/gpt-oss-20b
+   |
+   +--> public article page ---------+
+   |                                 |
+   +--> YouTube caption transcript --+--> random chunk sampling (if long)
+                                             |
+                                             +--> Groq: verdict + reason only
 ```
 
 Production:
@@ -83,10 +86,17 @@ Request:
 
 ```json
 {
-  "content": "A claim, article text, or one exact public URL",
-  "turnstileToken": "single-use-token"
+  "content": "A claim, article text, one exact public URL, or one exact YouTube URL",
+  "turnstileToken": "single-use-token",
+  "youtubeVideoId": "optional 11-character ID detected from an exact YouTube URL"
 }
 ```
+
+The frontend includes `youtubeVideoId` only for recognized `youtube.com` or
+`youtu.be` video URLs. The Worker validates that the ID matches `content`, then
+uses the dependency-free `youtube-transcript` package to retrieve available
+captions without a paid YouTube API or an LLM call. Videos without accessible
+captions return a structured error.
 
 Success:
 
@@ -161,10 +171,30 @@ Pages workflow.
 - URL submissions allow public HTTP(S) article pages only.
 - Redirects are revalidated; local/private targets and unusual ports are
   rejected.
-- Article downloads are limited to 512 KiB and extracted model input to 20,000
-  characters.
-- User content is explicitly treated as untrusted data in the model prompt.
+- Article downloads are limited to 512 KiB. Each YouTube response is limited to
+  2 MiB, must remain on an HTTPS `youtube.com` host, and has a timeout.
+- YouTube transcript retrieval happens only after successful Turnstile
+  verification.
+- Article text, captions, and user content are explicitly treated as untrusted
+  data in the model prompt.
 - There is no account system, database, claim history, or live web search.
+
+## Long articles and transcripts
+
+The model-input budget is 20,000 characters. Longer article text and YouTube
+transcripts are split into roughly 1,800-character chunks. The Worker randomly
+selects whole chunks that fit the budget and then restores those excerpts to
+their original source order. This avoids always judging only the beginning of a
+long source.
+
+This preparation is deterministic code except for the random selection. It
+does not use an LLM to detect URLs, retrieve transcripts, choose chunks, or
+summarize content. The only LLM request produces the `TRUE`, `FALSE`, or
+`UNVERIFIABLE` assessment and its reason.
+
+The Worker unit tests cover the YouTube flow with
+`https://www.youtube.com/watch?v=_neA7v3ulPU`, including Turnstile-first request
+ordering and long-transcript sampling.
 
 The Groq key originally used to bootstrap this repository was shared through a
 chat. Rotate it after initial deployment, then update both the ignored `.env`

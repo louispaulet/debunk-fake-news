@@ -6,6 +6,7 @@ import {
 } from './components/TurnstileWidget'
 import SiteHeader from './components/SiteHeader'
 import type { AnalysisResult, ApiErrorBody, Verdict } from './types'
+import { youtubeVideoIdFromUrl } from '../shared/youtube'
 
 const MAX_CONTENT_LENGTH = 20_000
 
@@ -55,6 +56,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const turnstileRef = useRef<TurnstileWidgetHandle>(null)
+  const detectedYoutubeVideoId = youtubeVideoIdFromUrl(content)
 
   const handleToken = useCallback((token: string | null) => {
     setTurnstileToken(token)
@@ -67,9 +69,10 @@ function App() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const normalizedContent = content.trim()
+    const youtubeVideoId = youtubeVideoIdFromUrl(normalizedContent)
 
     if (normalizedContent.length < 3) {
-      setError('Enter a claim, article, or article link first.')
+      setError('Enter a claim, article, article link, or YouTube video first.')
       return
     }
 
@@ -89,6 +92,7 @@ function App() {
         body: JSON.stringify({
           content: normalizedContent,
           turnstileToken,
+          ...(youtubeVideoId ? { youtubeVideoId } : {}),
         }),
       })
 
@@ -150,8 +154,8 @@ function App() {
             </span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-7 text-ink/65 sm:text-lg">
-            Paste a claim, article, or public link. We&apos;ll give you a quick
-            assessment and explain the reasoning.
+            Paste a claim, article, public link, or YouTube video. We&apos;ll give
+            you a quick assessment and explain the reasoning.
           </p>
         </section>
 
@@ -161,7 +165,7 @@ function App() {
             className="rounded-[1.75rem] border border-ink/10 bg-white/80 p-3 shadow-[0_24px_80px_-36px_rgba(28,36,32,0.38)] backdrop-blur sm:p-4"
           >
             <label htmlFor="content" className="sr-only">
-              Claim, article, or public article URL
+              Claim, article, public article URL, or YouTube URL
             </label>
             <textarea
               id="content"
@@ -173,7 +177,7 @@ function App() {
               minLength={3}
               maxLength={MAX_CONTENT_LENGTH}
               rows={8}
-              placeholder="Paste a claim, article, or link here…"
+              placeholder="Paste a claim, article, link, or YouTube video here…"
               className="min-h-48 w-full resize-y rounded-2xl border-0 bg-transparent px-4 py-4 text-base leading-7 text-ink outline-none placeholder:text-ink/35 focus:ring-2 focus:ring-forest/30 sm:px-5"
             />
 
@@ -214,7 +218,11 @@ function App() {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink/45">
-                <span>Links must point to a public HTML article.</span>
+                <span>
+                  {detectedYoutubeVideoId
+                    ? 'YouTube detected — its transcript will be assessed.'
+                    : 'Links may point to a public HTML article or YouTube video.'}
+                </span>
                 <span
                   className={remainingCharacters < 500 ? 'text-rose-700' : ''}
                 >
@@ -264,8 +272,8 @@ function App() {
 
         <section className="mx-auto mt-12 grid max-w-3xl gap-3 text-sm text-ink/60 sm:grid-cols-3">
           {[
-            ['01', 'Submit', 'Paste the exact claim or its source article.'],
-            ['02', 'Assess', 'The model checks clarity and available evidence.'],
+            ['01', 'Submit', 'Paste the claim, source article, or YouTube URL.'],
+            ['02', 'Assess', 'Video captions and article text are prepared first.'],
             ['03', 'Verify', 'Use the explanation to investigate further.'],
           ].map(([number, title, copy]) => (
             <div
